@@ -16,6 +16,8 @@ const urlDatabase = {
   "9sm5xK": "http://www.google.com"
 };
 
+const users = {};
+
 app.get("/", (req, res) => {
   res.send("Hello!");
 });
@@ -31,13 +33,20 @@ app.get("/hello", (req, res) => {
 app.get("/urls", (req, res) => {
   const templateVars = { 
     urls: urlDatabase, 
-    username: req.cookies["username"] 
+    user: users[req.cookies["user_id"]]
   };
   res.render("urls_index", templateVars);
 });
 
+app.get("/register", (req, res) => {
+  const templateVars = { 
+    user: users[req.cookies["user_id"]]
+  };
+  res.render("urls_register", templateVars);
+});
+
 app.get("/urls/new", (req, res) => {
-  const templateVars = { username: req.cookies["username"] };
+  const templateVars = { user: users[req.cookies["user_id"]] };
   res.render("urls_new", templateVars);
 });
 
@@ -45,7 +54,7 @@ app.get("/urls/:shortURL", (req, res) => {
   const templateVars = { 
     shortURL: req.params.shortURL, 
     longURL: urlDatabase[req.params.shortURL], 
-    username: req.cookies["username"]
+    user: users[req.cookies["user_id"]]
   };
   res.render("urls_show", templateVars);
 });
@@ -77,6 +86,23 @@ app.post("/logout", (req, res) => {
   res.redirect("/urls");  
 });
 
+app.post("/register", (req, res) => {
+  const email = req.body.email;
+  const password = req.body.password;
+  
+  if (!email || !password) {
+    return res.status(400).send("Please input both email and password");
+  }
+  
+  if (isEmailRegistered(email)) {
+    return res.status(400).send("This email is already registered");
+  }
+  const id = generateRandomString();
+  users[id] = {id, email, password};
+  res.cookie("user_id", id);
+  res.redirect("/urls");
+});
+
 app.post("/urls/:shortURL/delete", (req, res) => {
   delete urlDatabase[req.params.shortURL];   
   res.redirect("/urls");  
@@ -93,4 +119,13 @@ app.listen(PORT, () => {
 
 function generateRandomString() {
   return Math.random().toString(36).substring(2, 8);
+}
+
+function isEmailRegistered(email) {
+  for (const user_id in users) {
+    if (users[user_id].email === email) {
+      return true;
+    }
+  }
+  return false;
 }
