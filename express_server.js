@@ -100,9 +100,6 @@ app.get("/urls/:shortURL", (req, res) => {
 app.get("/u/:shortURL", (req, res) => {
   
   if (urlDatabase[req.params.shortURL]) {
-    if (urlDatabase[req.params.shortURL].userID !== req.cookies["user_id"]) {
-      return renderErrorPage(req, res, 403, "No permission to access this URL");
-    }
     const longURL = urlDatabase[req.params.shortURL].longURL;
     res.redirect(longURL);
   }
