@@ -12,14 +12,23 @@ app.set("view engine", "ejs");
 const PORT = 8080; 
 
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  b6UTxQ: {
+      longURL: "https://www.tsn.ca",
+      userID: "aJ48lW"
+  },
+  i3BoGr: {
+      longURL: "https://www.google.ca",
+      userID: "aJ48lW"
+  }
 };
 
 const users = {};
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  if (!req.cookies["user_id"]) {
+    res.redirect("/login");
+  }
+  res.redirect("/urls");
 });
 
 app.get("/urls.json", (req, res) => {
@@ -30,95 +39,130 @@ app.get("/hello", (req, res) => {
   res.send("<html><body>Hello <b>World</b></body></html>\n");
 });
 
+//show all available shorten url in database
 app.get("/urls", (req, res) => {
+  if (!req.cookies["user_id"]) {
+    return renderErrorPage(req, res, 403, "Please Login");
+  }
   const templateVars = { 
-    urls: urlDatabase, 
+    urls: urlsForUser(req.cookies["user_id"]), 
     user: users[req.cookies["user_id"]]
   };
   res.render("urls_index", templateVars);
 });
 
+// enter registration page
 app.get("/register", (req, res) => {
+  if (req.cookies["user_id"]) {
+    return res.redirect("/urls");
+  }
   const templateVars = { 
     user: users[req.cookies["user_id"]]
   };
   res.render("urls_register", templateVars);
 });
 
+// enter login page
 app.get("/login", (req, res) => {
+  if (req.cookies["user_id"]) {
+    return res.redirect("/urls");
+  }
   const templateVars = { 
     user: users[req.cookies["user_id"]]
   };
   res.render("urls_login", templateVars);
 });
 
+// enter create new url page
 app.get("/urls/new", (req, res) => {
+  if (!req.cookies["user_id"]) {
+    return res.redirect("/login");
+  }
   const templateVars = { user: users[req.cookies["user_id"]] };
   res.render("urls_new", templateVars);
 });
 
+// open detail of a short url to show long url
 app.get("/urls/:shortURL", (req, res) => {
+  if (urlDatabase[req.params.shortURL].userID !== req.cookies["user_id"]) {
+    return renderErrorPage(req, res, 403, "No permission to access this URL");
+  }
+
   const templateVars = { 
     shortURL: req.params.shortURL, 
-    longURL: urlDatabase[req.params.shortURL], 
+    longURL: urlDatabase[req.params.shortURL].longURL, 
     user: users[req.cookies["user_id"]]
   };
   res.render("urls_show", templateVars);
 });
 
+// redirect to long url based on a given short url
 app.get("/u/:shortURL", (req, res) => {
+  
   if (urlDatabase[req.params.shortURL]) {
-    const longURL = urlDatabase[req.params.shortURL];
+    if (urlDatabase[req.params.shortURL].userID !== req.cookies["user_id"]) {
+      return renderErrorPage(req, res, 403, "No permission to access this URL");
+    }
+    const longURL = urlDatabase[req.params.shortURL].longURL;
     res.redirect(longURL);
   }
   else {
-    res.end("404 Not Found");
+    return renderErrorPage(req, res, 404, "Short URL Not Found");
   }
 });
 
+//create new shorten url
 app.post("/urls", (req, res) => {
-  console.log(req.body);  // Log the POST request body to the console
+  if (!req.cookies["user_id"]) {
+    return renderErrorPage(req, res, 404, "Please login");
+  }
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
+  urlDatabase[shortURL] = { 
+    longURL: req.body.longURL,
+    userID: req.cookies["user_id"] 
+  };
   res.redirect(`/urls/${shortURL}`);       
 });
 
+//login
 app.post("/login", (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
   
   if (!email || !password) {
-    return res.status(400).send("Please input both email and password");
+    return renderErrorPage(req, res, 400, "Please input both email and password");
   }
   
   const user = isEmailRegistered(email);
   if (!user) {
-    return res.status(403).send("This email is not registered yet");
+    return renderErrorPage(req, res, 403, "This email is not registered yet");
   }
 
   if (user.password !== password) {
-    return res.status(403).send("Incorrect password");
+    return renderErrorPage(req, res, 403, "Incorrect password");
   }
 
   res.cookie("user_id", user.id);
   res.redirect("/urls");
 });
 
+//logout
 app.post("/logout", (req, res) => {
   res.clearCookie("user_id");
-  res.redirect("/urls");  
+  res.redirect("/login");  
 });
 
+//register
 app.post("/register", (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
   
   if (!email || !password) {
-    return res.status(400).send("Please input both email and password");
+    return renderErrorPage(req, res, 403, "Please input both email and password");
   }
   
   if (isEmailRegistered(email)) {
-    return res.status(400).send("This email is already registered");
+    return renderErrorPage(req, res, 403, "This email is already registered");
   }
   const id = generateRandomString();
   users[id] = {id, email, password};
@@ -126,13 +170,27 @@ app.post("/register", (req, res) => {
   res.redirect("/urls");
 });
 
+//delete
 app.post("/urls/:shortURL/delete", (req, res) => {
+  if (!urlDatabase[req.params.shortURL]) {
+    return renderErrorPage(req, res, 404, "This URL to be deleted is not found");
+  }
+  if (urlDatabase[req.params.shortURL].userID !== req.cookies["user_id"]) {
+    return renderErrorPage(req, res, 403, "No permission to delete this URL");
+  }
   delete urlDatabase[req.params.shortURL];   
   res.redirect("/urls");  
 });
 
+// update
 app.post("/urls/:id", (req, res) => {
-  urlDatabase[req.params.id] = req.body.updatedLongURL;   
+  if (!urlDatabase[req.params.id]) {
+    return renderErrorPage(req, res, 404, "This URL to be updated is not found");
+  }
+  if (urlDatabase[req.params.id].userID !== req.cookies["user_id"]) {
+    return renderErrorPage(req, res, 403, "No permission to update this URL");
+  }
+  urlDatabase[req.params.id].longURL = req.body.updatedLongURL;   
   res.redirect("/urls");  
 });
 
@@ -151,4 +209,23 @@ function isEmailRegistered(email) {
     }
   }
   return undefined;
+}
+
+function urlsForUser(user_id) {
+  const permittedURLs = {};
+  for (const item in urlDatabase) {
+    if (urlDatabase[item].userID === user_id) {
+      permittedURLs[item] = urlDatabase[item];
+    }
+  }
+  return permittedURLs;
+}
+
+function renderErrorPage(req, res, statusCode, errorMessage) {
+  const templateVars = { 
+    errorMessage: `${statusCode} - ${errorMessage}`,
+    urls: urlDatabase, 
+    user: users[req.cookies["user_id"]] 
+  };
+  return res.status(statusCode).render("urls_error", templateVars);
 }
