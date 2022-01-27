@@ -98,6 +98,14 @@ app.get("/urls/new", (req, res) => {
 // open detail of a short url to show long url
 app.get("/urls/:shortURL", (req, res) => {
   
+  if (!req.currentUser) {
+    return renderErrorPage(req, res, 403, "Please login");
+  }
+
+  if (!urlDatabase[req.params.shortURL]) {
+    return renderErrorPage(req, res, 404, "This URL is not in our database");
+  }
+
   if (urlDatabase[req.params.shortURL].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to access this URL");
   }
@@ -124,7 +132,7 @@ app.get("/u/:shortURL", (req, res) => {
 //create new shorten url
 app.post("/urls", (req, res) => {
   if (!req.currentUser) {
-    return renderErrorPage(req, res, 404, "Please login");
+    return renderErrorPage(req, res, 403, "Please login");
   }
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {
@@ -184,6 +192,9 @@ app.post("/register", (req, res) => {
 
 //delete
 app.post("/urls/:shortURL/delete", (req, res) => {
+  if (!req.currentUser) {
+    return renderErrorPage(req, res, 403, "Please login");
+  }
   if (!urlDatabase[req.params.shortURL]) {
     return renderErrorPage(req, res, 404, "This URL to be deleted is not found");
   }
@@ -196,6 +207,9 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 // update
 app.post("/urls/:id", (req, res) => {
+  if (!req.currentUser) {
+    return renderErrorPage(req, res, 403, "Please login");
+  }
   if (!urlDatabase[req.params.id]) {
     return renderErrorPage(req, res, 404, "This URL to be updated is not found");
   }
@@ -203,7 +217,7 @@ app.post("/urls/:id", (req, res) => {
     return renderErrorPage(req, res, 403, "No permission to update this URL");
   }
   urlDatabase[req.params.id].longURL = req.body.updatedLongURL;
-  res.redirect("/urls");
+  res.redirect(`/urls/`);
 });
 
 app.listen(PORT, () => {
