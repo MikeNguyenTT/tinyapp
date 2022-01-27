@@ -1,17 +1,30 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const bcrypt = require('bcryptjs');
+const cookieSession = require('cookie-session')
+const { getUserByEmail, generateRandomString, urlsForUser } = require('./helpers.js');
 
 const app = express();
 app.use(bodyParser.urlencoded({extended: true}));
-app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ["da097fa0-b5ef-4506-b8c3-28166cb4c4e8", "f0553cf8-a720-45d0-abba-e25dbc47eee6"]
+}))
 app.use(morgan("dev"));
 app.set("view engine", "ejs");
 
+// middleware function
+const currentUser = (req, res, next) => {
+  if (req.session["user_id"]) {
+    req.currentUser = req.session["user_id"];
+  }
+  next();
+}
+app.use(currentUser);
+
 const PORT = 8080; 
-const salt = bcrypt.genSaltSync(10);
+const SALT = bcrypt.genSaltSync(10);
 
 const urlDatabase = {
   b6UTxQ: {
@@ -25,15 +38,6 @@ const urlDatabase = {
 };
 
 const users = {};
-
-const currentUser = (req, res, next) => {
-  if (req.cookies["user_id"]) {
-    req.currentUser = req.cookies["user_id"];
-  }
-  next();
-}
-
-app.use(currentUser);
 
 app.get("/", (req, res) => {
   if (!req.currentUser) {
@@ -56,7 +60,7 @@ app.get("/urls", (req, res) => {
     return renderErrorPage(req, res, 403, "Please Login");
   }
   const templateVars = { 
-    urls: urlsForUser(req.currentUser), 
+    urls: urlsForUser(req.currentUser, urlDatabase), 
     user: users[req.currentUser]
   };
   res.render("urls_index", templateVars);
@@ -142,7 +146,7 @@ app.post("/login", (req, res) => {
     return renderErrorPage(req, res, 400, "Please input both email and password");
   }
   
-  const user = isEmailRegistered(email);
+  const user = getUserByEmail(email, users);
   if (!user) {
     return renderErrorPage(req, res, 403, "This email is not registered yet");
   }
@@ -150,14 +154,14 @@ app.post("/login", (req, res) => {
   if (!bcrypt.compareSync(plainPassword, user.hashedPassword)) {
     return renderErrorPage(req, res, 403, "Incorrect password");
   }
-
-  res.cookie("user_id", user.id);
+  
+  req.session["user_id"] = user.id;
   res.redirect("/urls");
 });
 
 //logout
 app.post("/logout", (req, res) => {
-  res.clearCookie("user_id");
+  req.session["user_id"] = null;
   res.redirect("/login");  
 });
 
@@ -170,14 +174,14 @@ app.post("/register", (req, res) => {
     return renderErrorPage(req, res, 403, "Please input both email and password");
   }
   
-  if (isEmailRegistered(email)) {
+  if (getUserByEmail(email, users)) {
     return renderErrorPage(req, res, 403, "This email is already registered");
   }
 
-  const hashedPassword = bcrypt.hashSync(plainPassword, salt);
+  const hashedPassword = bcrypt.hashSync(plainPassword, SALT);
   const id = generateRandomString();
   users[id] = {id, email, hashedPassword};
-  res.cookie("user_id", id);
+  req.session["user_id"] = id;
   res.redirect("/urls");
 });
 
@@ -208,29 +212,6 @@ app.post("/urls/:id", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
-
-function generateRandomString() {
-  return Math.random().toString(36).substring(2, 8);
-}
-
-function isEmailRegistered(email) {
-  for (const user_id in users) {
-    if (users[user_id].email === email) {
-      return users[user_id];
-    }
-  }
-  return undefined;
-}
-
-function urlsForUser(user_id) {
-  const permittedURLs = {};
-  for (const item in urlDatabase) {
-    if (urlDatabase[item].userID === user_id) {
-      permittedURLs[item] = urlDatabase[item];
-    }
-  }
-  return permittedURLs;
-}
 
 function renderErrorPage(req, res, statusCode, errorMessage) {
   const templateVars = { 
