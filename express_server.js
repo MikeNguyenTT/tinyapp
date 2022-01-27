@@ -24,8 +24,17 @@ const urlDatabase = {
 
 const users = {};
 
+const currentUser = (req, res, next) => {
+  if (req.cookies["user_id"]) {
+    req.currentUser = req.cookies["user_id"];
+  }
+  next();
+}
+
+app.use(currentUser);
+
 app.get("/", (req, res) => {
-  if (!req.cookies["user_id"]) {
+  if (!req.currentUser) {
     res.redirect("/login");
   }
   res.redirect("/urls");
@@ -41,57 +50,58 @@ app.get("/hello", (req, res) => {
 
 //show all available shorten url in database
 app.get("/urls", (req, res) => {
-  if (!req.cookies["user_id"]) {
+  if (!req.currentUser) {
     return renderErrorPage(req, res, 403, "Please Login");
   }
   const templateVars = { 
-    urls: urlsForUser(req.cookies["user_id"]), 
-    user: users[req.cookies["user_id"]]
+    urls: urlsForUser(req.currentUser), 
+    user: users[req.currentUser]
   };
   res.render("urls_index", templateVars);
 });
 
 // enter registration page
 app.get("/register", (req, res) => {
-  if (req.cookies["user_id"]) {
+  if (req.currentUser) {
     return res.redirect("/urls");
   }
   const templateVars = { 
-    user: users[req.cookies["user_id"]]
+    user: users[req.currentUser]
   };
   res.render("urls_register", templateVars);
 });
 
 // enter login page
 app.get("/login", (req, res) => {
-  if (req.cookies["user_id"]) {
+  if (req.currentUser) {
     return res.redirect("/urls");
   }
   const templateVars = { 
-    user: users[req.cookies["user_id"]]
+    user: users[req.currentUser]
   };
   res.render("urls_login", templateVars);
 });
 
 // enter create new url page
 app.get("/urls/new", (req, res) => {
-  if (!req.cookies["user_id"]) {
+  if (!req.currentUser) {
     return res.redirect("/login");
   }
-  const templateVars = { user: users[req.cookies["user_id"]] };
+  const templateVars = { user: users[req.currentUser] };
   res.render("urls_new", templateVars);
 });
 
 // open detail of a short url to show long url
 app.get("/urls/:shortURL", (req, res) => {
-  if (urlDatabase[req.params.shortURL].userID !== req.cookies["user_id"]) {
+  
+  if (urlDatabase[req.params.shortURL].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to access this URL");
   }
 
   const templateVars = { 
     shortURL: req.params.shortURL, 
     longURL: urlDatabase[req.params.shortURL].longURL, 
-    user: users[req.cookies["user_id"]]
+    user: users[req.currentUser]
   };
   res.render("urls_show", templateVars);
 });
@@ -110,13 +120,13 @@ app.get("/u/:shortURL", (req, res) => {
 
 //create new shorten url
 app.post("/urls", (req, res) => {
-  if (!req.cookies["user_id"]) {
+  if (!req.currentUser) {
     return renderErrorPage(req, res, 404, "Please login");
   }
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = { 
     longURL: req.body.longURL,
-    userID: req.cookies["user_id"] 
+    userID: req.currentUser
   };
   res.redirect(`/urls/${shortURL}`);       
 });
@@ -172,7 +182,7 @@ app.post("/urls/:shortURL/delete", (req, res) => {
   if (!urlDatabase[req.params.shortURL]) {
     return renderErrorPage(req, res, 404, "This URL to be deleted is not found");
   }
-  if (urlDatabase[req.params.shortURL].userID !== req.cookies["user_id"]) {
+  if (urlDatabase[req.params.shortURL].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to delete this URL");
   }
   delete urlDatabase[req.params.shortURL];   
@@ -184,7 +194,7 @@ app.post("/urls/:id", (req, res) => {
   if (!urlDatabase[req.params.id]) {
     return renderErrorPage(req, res, 404, "This URL to be updated is not found");
   }
-  if (urlDatabase[req.params.id].userID !== req.cookies["user_id"]) {
+  if (urlDatabase[req.params.id].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to update this URL");
   }
   urlDatabase[req.params.id].longURL = req.body.updatedLongURL;   
@@ -222,7 +232,7 @@ function renderErrorPage(req, res, statusCode, errorMessage) {
   const templateVars = { 
     errorMessage: `${statusCode} - ${errorMessage}`,
     urls: urlDatabase, 
-    user: users[req.cookies["user_id"]] 
+    user: users[req.currentUser] 
   };
   return res.status(statusCode).render("urls_error", templateVars);
 }
