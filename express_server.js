@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
+const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(bodyParser.urlencoded({extended: true}));
@@ -10,6 +11,7 @@ app.use(morgan("dev"));
 app.set("view engine", "ejs");
 
 const PORT = 8080; 
+const salt = bcrypt.genSaltSync(10);
 
 const urlDatabase = {
   b6UTxQ: {
@@ -134,9 +136,9 @@ app.post("/urls", (req, res) => {
 //login
 app.post("/login", (req, res) => {
   const email = req.body.email;
-  const password = req.body.password;
+  const plainPassword = req.body.password;
   
-  if (!email || !password) {
+  if (!email || !plainPassword) {
     return renderErrorPage(req, res, 400, "Please input both email and password");
   }
   
@@ -145,7 +147,7 @@ app.post("/login", (req, res) => {
     return renderErrorPage(req, res, 403, "This email is not registered yet");
   }
 
-  if (user.password !== password) {
+  if (!bcrypt.compareSync(plainPassword, user.hashedPassword)) {
     return renderErrorPage(req, res, 403, "Incorrect password");
   }
 
@@ -162,17 +164,19 @@ app.post("/logout", (req, res) => {
 //register
 app.post("/register", (req, res) => {
   const email = req.body.email;
-  const password = req.body.password;
+  const plainPassword = req.body.password;
   
-  if (!email || !password) {
+  if (!email || !plainPassword) {
     return renderErrorPage(req, res, 403, "Please input both email and password");
   }
   
   if (isEmailRegistered(email)) {
     return renderErrorPage(req, res, 403, "This email is already registered");
   }
+
+  const hashedPassword = bcrypt.hashSync(plainPassword, salt);
   const id = generateRandomString();
-  users[id] = {id, email, password};
+  users[id] = {id, email, hashedPassword};
   res.cookie("user_id", id);
   res.redirect("/urls");
 });
