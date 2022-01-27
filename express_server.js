@@ -2,7 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
 const bcrypt = require('bcryptjs');
-const cookieSession = require('cookie-session')
+const cookieSession = require('cookie-session');
 const { getUserByEmail, generateRandomString, urlsForUser } = require('./helpers.js');
 
 const app = express();
@@ -10,7 +10,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.use(cookieSession({
   name: 'session',
   keys: ["da097fa0-b5ef-4506-b8c3-28166cb4c4e8", "f0553cf8-a720-45d0-abba-e25dbc47eee6"]
-}))
+}));
 app.use(morgan("dev"));
 app.set("view engine", "ejs");
 
@@ -20,20 +20,20 @@ const currentUser = (req, res, next) => {
     req.currentUser = req.session["user_id"];
   }
   next();
-}
+};
 app.use(currentUser);
 
-const PORT = 8080; 
+const PORT = 8080;
 const SALT = bcrypt.genSaltSync(10);
 
 const urlDatabase = {
   b6UTxQ: {
-      longURL: "https://www.tsn.ca",
-      userID: "aJ48lW"
+    longURL: "https://www.tsn.ca",
+    userID: "aJ48lW"
   },
   i3BoGr: {
-      longURL: "https://www.google.ca",
-      userID: "aJ48lW"
+    longURL: "https://www.google.ca",
+    userID: "aJ48lW"
   }
 };
 
@@ -59,8 +59,8 @@ app.get("/urls", (req, res) => {
   if (!req.currentUser) {
     return renderErrorPage(req, res, 403, "Please Login");
   }
-  const templateVars = { 
-    urls: urlsForUser(req.currentUser, urlDatabase), 
+  const templateVars = {
+    urls: urlsForUser(req.currentUser, urlDatabase),
     user: users[req.currentUser]
   };
   res.render("urls_index", templateVars);
@@ -71,7 +71,7 @@ app.get("/register", (req, res) => {
   if (req.currentUser) {
     return res.redirect("/urls");
   }
-  const templateVars = { 
+  const templateVars = {
     user: users[req.currentUser]
   };
   res.render("urls_register", templateVars);
@@ -82,7 +82,7 @@ app.get("/login", (req, res) => {
   if (req.currentUser) {
     return res.redirect("/urls");
   }
-  const templateVars = { 
+  const templateVars = {
     user: users[req.currentUser]
   };
   res.render("urls_login", templateVars);
@@ -104,9 +104,9 @@ app.get("/urls/:shortURL", (req, res) => {
     return renderErrorPage(req, res, 403, "No permission to access this URL");
   }
 
-  const templateVars = { 
-    shortURL: req.params.shortURL, 
-    longURL: urlDatabase[req.params.shortURL].longURL, 
+  const templateVars = {
+    shortURL: req.params.shortURL,
+    longURL: urlDatabase[req.params.shortURL].longURL,
     user: users[req.currentUser]
   };
   res.render("urls_show", templateVars);
@@ -118,8 +118,7 @@ app.get("/u/:shortURL", (req, res) => {
   if (urlDatabase[req.params.shortURL]) {
     const longURL = urlDatabase[req.params.shortURL].longURL;
     res.redirect(longURL);
-  }
-  else {
+  } else {
     return renderErrorPage(req, res, 404, "Short URL Not Found");
   }
 });
@@ -130,11 +129,11 @@ app.post("/urls", (req, res) => {
     return renderErrorPage(req, res, 404, "Please login");
   }
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = { 
+  urlDatabase[shortURL] = {
     longURL: req.body.longURL,
     userID: req.currentUser
   };
-  res.redirect(`/urls/${shortURL}`);       
+  res.redirect(`/urls/${shortURL}`);
 });
 
 //login
@@ -162,7 +161,7 @@ app.post("/login", (req, res) => {
 //logout
 app.post("/logout", (req, res) => {
   req.session["user_id"] = null;
-  res.redirect("/login");  
+  res.redirect("/login");
 });
 
 //register
@@ -193,8 +192,8 @@ app.post("/urls/:shortURL/delete", (req, res) => {
   if (urlDatabase[req.params.shortURL].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to delete this URL");
   }
-  delete urlDatabase[req.params.shortURL];   
-  res.redirect("/urls");  
+  delete urlDatabase[req.params.shortURL];
+  res.redirect("/urls");
 });
 
 // update
@@ -205,19 +204,19 @@ app.post("/urls/:id", (req, res) => {
   if (urlDatabase[req.params.id].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to update this URL");
   }
-  urlDatabase[req.params.id].longURL = req.body.updatedLongURL;   
-  res.redirect("/urls");  
+  urlDatabase[req.params.id].longURL = req.body.updatedLongURL;
+  res.redirect("/urls");
 });
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
 
-function renderErrorPage(req, res, statusCode, errorMessage) {
-  const templateVars = { 
+const renderErrorPage = (req, res, statusCode, errorMessage) => {
+  const templateVars = {
     errorMessage: `${statusCode} - ${errorMessage}`,
-    urls: urlDatabase, 
-    user: users[req.currentUser] 
+    urls: urlDatabase,
+    user: users[req.currentUser]
   };
   return res.status(statusCode).render("urls_error", templateVars);
-}
+};

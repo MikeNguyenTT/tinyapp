@@ -1,24 +1,24 @@
-function getUserByEmail(email, database) {
-  for (const user_id in database) {
-    if (database[user_id].email === email) {
-      return database[user_id];
+const getUserByEmail = (email, database) => {
+  for (const userId in database) {
+    if (database[userId].email === email) {
+      return database[userId];
     }
   }
   return undefined;
-}
+};
 
-function generateRandomString() {
+const generateRandomString = () => {
   return Math.random().toString(36).substring(2, 8);
-}
+};
 
-function urlsForUser(user_id, urlDatabase) {
+const urlsForUser = (userId, urlDatabase) => {
   const permittedURLs = {};
   for (const item in urlDatabase) {
-    if (urlDatabase[item].userID === user_id) {
+    if (urlDatabase[item].userID === userId) {
       permittedURLs[item] = urlDatabase[item];
     }
   }
   return permittedURLs;
-}
+};
 
 module.exports = { getUserByEmail, generateRandomString, urlsForUser };
