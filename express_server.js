@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
+const methodOverride = require('method-override')
 const { getUserByEmail, generateRandomString, urlsForUser } = require('./helpers.js');
 
 const app = express();
@@ -10,6 +11,7 @@ app.use(cookieSession({
   name: 'session',
   keys: ["da097fa0-b5ef-4506-b8c3-28166cb4c4e8", "f0553cf8-a720-45d0-abba-e25dbc47eee6"]
 }));
+app.use(methodOverride('_method'))
 app.set("view engine", "ejs");
 
 // middleware function
@@ -191,7 +193,7 @@ app.post("/register", (req, res) => {
 });
 
 //delete
-app.post("/urls/:shortURL/delete", (req, res) => {
+app.delete("/urls/:shortURL", (req, res) => {
   if (!req.currentUser) {
     return renderErrorPage(req, res, 403, "Please login");
   }
@@ -206,7 +208,7 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 });
 
 // update
-app.post("/urls/:id", (req, res) => {
+app.put("/urls/:id", (req, res) => {
   if (!req.currentUser) {
     return renderErrorPage(req, res, 403, "Please login");
   }
