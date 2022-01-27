@@ -1,6 +1,5 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const morgan = require("morgan");
 const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
 const { getUserByEmail, generateRandomString, urlsForUser } = require('./helpers.js');
@@ -11,7 +10,6 @@ app.use(cookieSession({
   name: 'session',
   keys: ["da097fa0-b5ef-4506-b8c3-28166cb4c4e8", "f0553cf8-a720-45d0-abba-e25dbc47eee6"]
 }));
-app.use(morgan("dev"));
 app.set("view engine", "ejs");
 
 // middleware function
