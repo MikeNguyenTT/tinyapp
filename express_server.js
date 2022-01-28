@@ -29,11 +29,17 @@ const SALT = bcrypt.genSaltSync(10);
 const urlDatabase = {
   b6UTxQ: {
     longURL: "https://www.tsn.ca",
-    userID: "aJ48lW"
+    userID: "aJ48lW", 
+    dateCreated: new Date(), 
+    totalVisits: 0,
+    uniqueVisitors: []
   },
   i3BoGr: {
     longURL: "https://www.google.ca",
-    userID: "aJ48lW"
+    userID: "aJ48lW",
+    dateCreated: new Date(), 
+    totalVisits: 0,
+    uniqueVisitors: []
   }
 };
 
@@ -112,13 +118,14 @@ app.get("/urls/:shortURL", (req, res) => {
     return renderErrorPage(req, res, 403, "No permission to access this URL");
   }
 
-  let totalVisits = req.session[`${shortURL}_count`] ? req.session[`${shortURL}_count`] : 0;
-  let uniqueVisitors = req.session[`${shortURL}_uniqueVisitors`] ? req.session[`${shortURL}_uniqueVisitors`] : 0; 
+  let totalVisits = urlDatabase[shortURL].totalVisits;
+  let uniqueVisitors = urlDatabase[shortURL].uniqueVisitors.length;
   let visits = visitStat[shortURL] ? visitStat[shortURL].visits : [];
   const templateVars = {
     shortURL,
     longURL: urlDatabase[shortURL].longURL,
     user: users[req.currentUser], 
+    dateCreated: urlDatabase[shortURL].dateCreated.toLocaleString(),
     totalVisits,
     uniqueVisitors, 
     visits
@@ -130,7 +137,16 @@ app.get("/urls/:shortURL", (req, res) => {
 app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
   if (urlDatabase[shortURL]) {
+      // keep track how many times this URL has been visited
+    urlDatabase[shortURL].totalVisits = urlDatabase[shortURL].totalVisits + 1
+
+    // Keep track how many unique visitors
+    if (!urlDatabase[shortURL].uniqueVisitors.includes(req.currentUser)) {
+      urlDatabase[shortURL].uniqueVisitors.push(req.currentUser);
+    }
+    // Keep a record of visiting time and visitor id
     setStatForTracking(req, shortURL);
+
     const longURL = urlDatabase[shortURL].longURL;
     res.redirect(longURL);
   } else {
@@ -146,7 +162,10 @@ app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {
     longURL: req.body.longURL,
-    userID: req.currentUser
+    userID: req.currentUser, 
+    dateCreated: new Date(), 
+    totalVisits: 0,
+    uniqueVisitors: []
   };
   res.redirect(`/urls/${shortURL}`);
 });
@@ -175,7 +194,7 @@ app.post("/login", (req, res) => {
 
 //logout
 app.post("/logout", (req, res) => {
-  req.session["user_id"] = null;
+  req.session = null;
   res.redirect("/login");
 });
 
@@ -247,27 +266,13 @@ const renderErrorPage = (req, res, statusCode, errorMessage) => {
 // Visit statistic in database instead of cookie
 const visitStat = {};
 const setStatForTracking = (req, shortURL) => {
-  // keep track how many times this URL has been visited
-  req.session[`${shortURL}_count`] = req.session[`${shortURL}_count`] ? req.session[`${shortURL}_count`] + 1 : 1;
-
-  // Keep track how many unique visitors
-  const uniqueVisitorsList = [];
+  // Track visit time and generate visitor_id
   if (!visitStat[shortURL]) {
     visitStat[shortURL] = {
         uniqueVisitors: [req.currentUser],
         visits: []
     }
   }
-  else {
-    const uniqueVisitorsList = visitStat[shortURL].uniqueVisitors;
-    if (!uniqueVisitorsList.includes(req.currentUser)) {
-      uniqueVisitorsList.push(req.currentUser);
-    }
-    
-  }
-  // Track visit time and generate visitor_id
   const visitorId = req.currentUser ? req.currentUser : `${generateRandomString()}_guest`
   visitStat[shortURL].visits.push( { time: new Date(), visitorId }) 
-  // set a cookie for frond end access
-  req.session[`${shortURL}_uniqueVisitors`] = visitStat[shortURL].uniqueVisitors.length;
 }
