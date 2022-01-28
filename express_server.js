@@ -99,32 +99,39 @@ app.get("/urls/new", (req, res) => {
 
 // open detail of a short url to show long url
 app.get("/urls/:shortURL", (req, res) => {
-  
+  const shortURL = req.params.shortURL;
   if (!req.currentUser) {
     return renderErrorPage(req, res, 403, "Please login");
   }
 
-  if (!urlDatabase[req.params.shortURL]) {
+  if (!urlDatabase[shortURL]) {
     return renderErrorPage(req, res, 404, "This URL is not in our database");
   }
 
-  if (urlDatabase[req.params.shortURL].userID !== req.currentUser) {
+  if (urlDatabase[shortURL].userID !== req.currentUser) {
     return renderErrorPage(req, res, 403, "No permission to access this URL");
   }
 
+  let totalVisits = req.session[`${shortURL}_count`] ? req.session[`${shortURL}_count`] : 0;
+  let uniqueVisitors = req.session[`${shortURL}_uniqueVisitors`] ? req.session[`${shortURL}_uniqueVisitors`] : 0; 
+  let visits = visitStat[shortURL] ? visitStat[shortURL].visits : [];
   const templateVars = {
-    shortURL: req.params.shortURL,
-    longURL: urlDatabase[req.params.shortURL].longURL,
-    user: users[req.currentUser]
+    shortURL,
+    longURL: urlDatabase[shortURL].longURL,
+    user: users[req.currentUser], 
+    totalVisits,
+    uniqueVisitors, 
+    visits
   };
   res.render("urls_show", templateVars);
 });
 
 // redirect to long url based on a given short url
 app.get("/u/:shortURL", (req, res) => {
-  
-  if (urlDatabase[req.params.shortURL]) {
-    const longURL = urlDatabase[req.params.shortURL].longURL;
+  const shortURL = req.params.shortURL;
+  if (urlDatabase[shortURL]) {
+    setStatForTracking(req, shortURL);
+    const longURL = urlDatabase[shortURL].longURL;
     res.redirect(longURL);
   } else {
     return renderErrorPage(req, res, 404, "Short URL Not Found");
@@ -234,3 +241,31 @@ const renderErrorPage = (req, res, statusCode, errorMessage) => {
   };
   return res.status(statusCode).render("urls_error", templateVars);
 };
+
+// Visit statistic in database instead of cookie
+const visitStat = {};
+const setStatForTracking = (req, shortURL) => {
+  // keep track how many times this URL has been visited
+  req.session[`${shortURL}_count`] = req.session[`${shortURL}_count`] ? req.session[`${shortURL}_count`] + 1 : 1;
+
+  // Keep track how many unique visitors
+  const uniqueVisitorsList = [];
+  if (!visitStat[shortURL]) {
+    visitStat[shortURL] = {
+        uniqueVisitors: [req.currentUser],
+        visits: []
+    }
+  }
+  else {
+    const uniqueVisitorsList = visitStat[shortURL].uniqueVisitors;
+    if (!uniqueVisitorsList.includes(req.currentUser)) {
+      uniqueVisitorsList.push(req.currentUser);
+    }
+    
+  }
+  // Track visit time and generate visitor_id
+  const visitorId = req.currentUser ? req.currentUser : `${generateRandomString()}_guest`
+  visitStat[shortURL].visits.push( { time: new Date(), visitorId }) 
+  // set a cookie for frond end access
+  req.session[`${shortURL}_uniqueVisitors`] = visitStat[shortURL].uniqueVisitors.length;
+}
