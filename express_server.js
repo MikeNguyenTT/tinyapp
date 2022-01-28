@@ -233,6 +233,8 @@ app.listen(PORT, () => {
   console.log(`TinyApp listening on port ${PORT}!`);
 });
 
+
+// rendering error page with proper status code and error message
 const renderErrorPage = (req, res, statusCode, errorMessage) => {
   const templateVars = {
     errorMessage: `${statusCode} - ${errorMessage}`,
