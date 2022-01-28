@@ -41,7 +41,7 @@ const users = {};
 
 app.get("/", (req, res) => {
   if (!req.currentUser) {
-    res.redirect("/login");
+    return res.redirect("/login");
   }
   res.redirect("/urls");
 });
